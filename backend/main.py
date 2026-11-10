@@ -1,29 +1,13 @@
-
-from fastapi import FastAPI
-from pydantic import BaseModel, Field
+import logging
+from datetime import datetime
 from typing import Literal
 
-app = FastAPI(title="ServiceFlow AI")
+from fastapi import FastAPI, Depends,HTTPException, status
+from pydantic import BaseModel,ConfigDict, Field
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from sqlalchemy.orm import Session
 
+from database import get_db
+from models import Lead
 
-class LeadRequest(BaseModel):
-    name: str = Field(min_length=2)
-    phone: str = Field(min_length=7)
-    service: Literal["ac_repair", "plumbing", "electrical"]
-    message: str = Field(min_length=10)
-
-
-@app.get("/health")
-def health_check():
-    return {"status": "healthy"}
-
-
-@app.post("/leads")
-def receive_lead(lead: LeadRequest):
-    return {
-        "valid": True,
-        "stored": False,
-        "customer": lead.name,
-        "service": lead.service,
-        "message": "Request validated successfully"
-    }
+app = FastAPI(title="Service Flow")
