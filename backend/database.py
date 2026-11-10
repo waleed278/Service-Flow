@@ -5,6 +5,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
+from collections.abc import Generator
+from sqlalchemy.orm import Session, sessionmaker
 
 
 # Find project root directory
@@ -31,3 +33,13 @@ engine = create_engine(
     pool_pre_ping=True,
     echo=False,
 )
+
+Session_Local = sessionmaker(
+    bind=engine,
+    expire_on_commit=False
+)
+
+def get_db()-> Generator[Session,None,None]:
+    with Session_Local() as db:
+        yield db
+        
