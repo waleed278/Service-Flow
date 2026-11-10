@@ -81,3 +81,42 @@ def create_lead(
         )
 
     return new_lead
+
+
+
+@app.get(
+    "/leads/{lead_id}",
+    response_model=LeadResponse
+)
+def get_lead(
+    lead_id: int,
+    db: Session = Depends(get_db)
+):
+    try:
+        lead = db.get(Lead, lead_id)
+
+    except OperationalError:
+        db.rollback()
+        logger.exception("Database unavailable while reading lead")
+
+        raise HTTPException(
+            status_code=503,
+            detail="Database temporarily unavailable"
+        )
+
+    except SQLAlchemyError:
+        db.rollback()
+        logger.exception("Failed to retrieve lead")
+
+        raise HTTPException(
+            status_code=500,
+            detail="Could not retrieve lead"
+        )
+
+    if lead is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Lead not found"
+        )
+
+    return lead
