@@ -8,6 +8,7 @@ from sqlalchemy import (
     Text,
     func,
     text,
+    String,
 )
 
 from sqlalchemy.orm import (
@@ -62,3 +63,15 @@ class Lead(Base):
         nullable=False,
         server_default=func.now()
     )
+
+    idempotency_key: Mapped[str | None] = mapped_column(
+        String(128),
+        unique=True,
+        nullable=True
+)
+
+    request_hash: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True
+)
+
