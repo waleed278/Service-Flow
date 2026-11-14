@@ -21,6 +21,22 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      TZ: Asia/Karachi
+      GENERIC_TIMEZONE: Asia/Karachi
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+
+    volumes:
+      - n8n_data:/home/node/.n8n
+
 
 volumes:
   postgres_data:
+  n8n_data:
