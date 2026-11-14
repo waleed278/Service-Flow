@@ -13,6 +13,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import text
 from main import app
 from database import get_db
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+from uuid import uuid4
+from sqlalchemy import delete, func
 
 # Load project environment configuration
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -232,3 +236,110 @@ def test_duplicate_request_creates_only_one_lead():
         finally:
             app.dependency_overrides.pop(get_db, None)
             outer_transaction.rollback()
+
+
+
+def test_concurrent_requests_create_one_lead():
+
+    # Protect normal development database
+    assert test_engine.url.database == "serviceflow_test"
+
+    Base.metadata.create_all(test_engine)
+
+    # Unique key for this test run
+    key = f"parallel-{uuid4().hex}"
+
+    payload = {
+        "name": "Parallel Test Customer",
+        "phone": "03001234567",
+        "service": "ac_repair",
+        "message": "My AC stopped working yesterday."
+    }
+
+    barrier = Barrier(2, timeout=10)
+
+    # Each API request gets its own real Session
+    def override_get_db():
+        with Session(
+            test_engine,
+            expire_on_commit=False
+        ) as db:
+            yield db
+
+    # Function executed by each worker
+    def send_request():
+        with TestClient(app) as client:
+
+            # Wait until both workers are ready
+            barrier.wait()
+
+            return client.post(
+                "/leads",
+                json=payload,
+                headers={
+                    "Idempotency-Key": key
+                }
+            )
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    try:
+        # Launch two workers
+        with ThreadPoolExecutor(max_workers=2) as pool:
+
+            futures = [
+                pool.submit(send_request)
+                for _ in range(2)
+            ]
+
+            responses = [
+                future.result(timeout=30)
+                for future in futures
+            ]
+
+        # Inspect both responses
+        for response in responses:
+            print(
+                "Status:",
+                response.status_code,
+                "Body:",
+                response.json()
+            )
+
+        # One creation and one replay
+        statuses = sorted(
+            response.status_code
+            for response in responses
+        )
+
+        assert statuses == [200, 201], [
+            (r.status_code, r.text) for r in responses
+        ]
+
+        # Both responses refer to the same lead
+        ids = [r.json()["id"] for r in responses]
+
+        assert ids[0] == ids[1]
+
+        # Verify actual committed database rows
+        with Session(test_engine) as db:
+
+            total = db.scalar(
+                select(func.count())
+                .select_from(Lead)
+                .where(Lead.idempotency_key == key)
+            )
+
+            assert total == 1
+
+    finally:
+        # Restore application dependencies
+        app.dependency_overrides.pop(get_db, None)
+
+        # Delete only this test's records
+        with test_engine.begin() as connection:
+            connection.execute(
+                delete(Lead).where(
+                    Lead.idempotency_key == key
+                )
+            )
