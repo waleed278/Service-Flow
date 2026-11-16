@@ -104,7 +104,9 @@ def test_api_post_get_with_savepoint():
 
         try:
             with TestClient(app) as client:
-
+                client.headers.update({
+        "X-Internal-API-Key": os.environ["INTERNAL_API_KEY"]
+    })
                 # 1. Create a real lead through FastAPI
                 response = client.post(
                     "/leads",
@@ -188,7 +190,9 @@ def test_duplicate_request_creates_only_one_lead():
 
         try:
             with TestClient(app) as client:
-
+                client.headers.update({
+        "X-Internal-API-Key": os.environ["INTERNAL_API_KEY"]
+    })
                 payload = {
                     "name": "Duplicate Test Customer",
                     "phone": "03001112222",
@@ -269,7 +273,9 @@ def test_concurrent_requests_create_one_lead():
     # Function executed by each worker
     def send_request():
         with TestClient(app) as client:
-
+            client.headers.update({
+        "X-Internal-API-Key": os.environ["INTERNAL_API_KEY"]
+    })
             # Wait until both workers are ready
             barrier.wait()
 
@@ -343,3 +349,4 @@ def test_concurrent_requests_create_one_lead():
                     Lead.idempotency_key == key
                 )
             )
+

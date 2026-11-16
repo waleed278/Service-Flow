@@ -17,6 +17,7 @@ import json
 from fastapi import Header,Response
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from auth import require_internal_api_key
 
 app = FastAPI(title="ServiceFlow AI")
 
@@ -59,7 +60,9 @@ def create_lead(
         max_length=128,
         pattern=r"^[A-Za-z0-9._:-]+$"
     ),
+    api_key_checked: None =Depends(require_internal_api_key),
     db: Session = Depends(get_db)
+    
 ):
 
     # Step 1: Generate a consistent request fingerprint
@@ -158,6 +161,7 @@ def create_lead(
 )
 def get_lead(
     lead_id: int,
+    pi_key_checked: None =Depends(require_internal_api_key),
     db: Session = Depends(get_db)
 ):
     try:

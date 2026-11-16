@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from main import app
 from database import get_db
 from models import Lead
-
+import os
 
 @pytest.fixture
 def test_setup():
@@ -25,6 +25,9 @@ def test_setup():
 
     try:
         with TestClient(app) as client:
+            client.headers.update({
+                "X-Internal-API-Key": os.environ["INTERNAL_API_KEY"]
+            })
             yield client, fake_db
     finally:
         app.dependency_overrides.pop(get_db, None)
@@ -80,3 +83,31 @@ def test_database_unavailable(test_setup):
     )
 
     fake_db.rollback.assert_called_once()
+
+
+def test_missing_api_key_is_rejected(test_setup):
+
+    client, fake_db = test_setup
+
+    # Remove the valid key added by our fixture
+    client.headers.pop("X-Internal-API-Key", None)
+
+    response = client.get("/leads/1")
+
+    assert response.status_code == 401
+
+    # Database must not be queried
+    fake_db.get.assert_not_called()
+
+
+def test_invalid_api_key_is_rejected(test_setup):
+
+    client, fake_db = test_setup
+
+    client.headers["X-Internal-API-Key"] = "wrong-key"
+
+    response = client.get("/leads/1")
+
+    assert response.status_code == 401
+
+    fake_db.get.assert_not_called()
