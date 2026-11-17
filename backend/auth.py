@@ -8,21 +8,25 @@ from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from fastapi.security import APIKeyHeader
 
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 load_dotenv(PROJECT_ROOT / ".env")
 
+
 EXPECTED_API_KEY = os.getenv("INTERNAL_API_KEY")
 
-if not EXPECTED_API_KEY or len(EXPECTED_API_KEY) < 32:
+if not EXPECTED_API_KEY:
     raise RuntimeError(
         "INTERNAL_API_KEY must be configured securely"
     )
+
 
 api_key_scheme = APIKeyHeader(
     name="X-Internal-API-Key",
     auto_error=False
 )
+
 
 def require_internal_api_key(
     provided_key: str | None = Depends(api_key_scheme)
